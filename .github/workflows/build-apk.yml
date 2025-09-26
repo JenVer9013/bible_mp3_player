@@ -51,21 +51,29 @@ jobs:
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O android-tools.zip
         unzip -q android-tools.zip -d $HOME/android-sdk
         
+        # cmdline-tools 경로 수정 (latest 폴더로 이동)
+        mkdir -p $HOME/android-sdk/cmdline-tools/latest
+        mv $HOME/android-sdk/cmdline-tools/* $HOME/android-sdk/cmdline-tools/latest/ 2>/dev/null || true
+        
         # 환경 변수 설정
         export ANDROID_HOME=$HOME/android-sdk
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
         
         # SDK 라이선스 승인
-        yes | $HOME/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses || true
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
         
         # 필요한 패키지 설치
-        $HOME/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529"
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529"
+        
+        # AIDL 도구 확인
+        ls -la $ANDROID_HOME/build-tools/30.0.3/aidl || echo "AIDL not found in build-tools"
         
         # buildozer용 환경 변수 설정
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
         echo "ANDROID_NDK_HOME=$HOME/android-sdk/ndk/21.4.7075529" >> $GITHUB_ENV
-        echo "PATH=$PATH:$HOME/android-sdk/cmdline-tools/bin:$HOME/android-sdk/platform-tools" >> $GITHUB_ENV
+        echo "PATH=$PATH:$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$HOME/android-sdk/build-tools/30.0.3" >> $GITHUB_ENV
 
     - name: 📱 Buildozer 초기화 및 APK 빌드
       run: |

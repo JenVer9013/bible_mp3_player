@@ -15,3 +15,10 @@ log_level = 1
 fullscreen = 0
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 android.arch = armeabi-v7a
+
+# Android SDK/NDK 경로 설정
+android.sdk_path = /home/runner/android-sdk
+android.ndk_path = /home/runner/android-sdk/ndk/21.4.7075529
+android.api = 30
+android.minapi = 21
+android.ndk_api = 21
