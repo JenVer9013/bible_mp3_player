@@ -45,6 +45,28 @@ jobs:
         python -m pip install --upgrade pip
         pip install buildozer cython kivy[base] requests
 
+    - name: 📱 Android SDK 및 도구 설치
+      run: |
+        # Android SDK 설치
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O android-tools.zip
+        unzip -q android-tools.zip -d $HOME/android-sdk
+        
+        # 환경 변수 설정
+        export ANDROID_HOME=$HOME/android-sdk
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/bin:$ANDROID_HOME/platform-tools
+        
+        # SDK 라이선스 승인
+        yes | $HOME/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME --licenses || true
+        
+        # 필요한 패키지 설치
+        $HOME/android-sdk/cmdline-tools/bin/sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529"
+        
+        # buildozer용 환경 변수 설정
+        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=$HOME/android-sdk/ndk/21.4.7075529" >> $GITHUB_ENV
+        echo "PATH=$PATH:$HOME/android-sdk/cmdline-tools/bin:$HOME/android-sdk/platform-tools" >> $GITHUB_ENV
+
     - name: 📱 Buildozer 초기화 및 APK 빌드
       run: |
         # buildozer.spec 파일 사용
