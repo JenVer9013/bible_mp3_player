@@ -55,7 +55,7 @@ jobs:
         ls -la bin/
 
     - name: 🚀 APK 파일 업로드
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: bible-mp3-player-${{ github.event.inputs.build_type || 'debug' }}-apk
         path: bin/*.apk
