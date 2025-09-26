@@ -22,3 +22,9 @@ android.ndk_path = /home/runner/android-sdk/ndk/21.4.7075529
 android.api = 30
 android.minapi = 21
 android.ndk_api = 21
+
+# build-tools 버전 명시 (빌드에 사용될 정확한 버전)
+android.build_tools_version = 30.0.3
+
+# AIDL 도구 경로 명시
+android.aidl = /home/runner/android-sdk/build-tools/30.0.3/aidl

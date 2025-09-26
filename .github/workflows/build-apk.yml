@@ -60,14 +60,33 @@ jobs:
         export ANDROID_SDK_ROOT=$HOME/android-sdk
         export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
         
-        # SDK 라이선스 승인
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        # 라이선스 디렉토리 생성
+        mkdir -p $ANDROID_HOME/licenses
         
-        # 필요한 패키지 설치
+        # 모든 라이선스 자동 승인 (강제 승인)
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+        echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $ANDROID_HOME/licenses/intel-android-extra-license
+        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $ANDROID_HOME/licenses/android-googletv-license
+        echo "79120722343a6f314e0719f863036c702b0e6b2a" > $ANDROID_HOME/licenses/android-sdk-arm-dbt-license
+        echo "e9acab5b5fbb560a72cfaecce8946896ff6aab9d" > $ANDROID_HOME/licenses/mips-android-sysimage-license
+        echo "504667f4c0de7af1a06de9f4b1727b84351f2910" > $ANDROID_HOME/licenses/google-gdk-license
+        
+        # 필요한 패키지 설치 (라이선스 자동 승인과 함께)
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529"
         
-        # AIDL 도구 확인
-        ls -la $ANDROID_HOME/build-tools/30.0.3/aidl || echo "AIDL not found in build-tools"
+        # AIDL 도구 확인 및 설치 검증
+        echo "=== AIDL 도구 확인 시작 ==="
+        if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
+            echo "✅ AIDL 도구 발견: $ANDROID_HOME/build-tools/30.0.3/aidl"
+            ls -la $ANDROID_HOME/build-tools/30.0.3/aidl
+            $ANDROID_HOME/build-tools/30.0.3/aidl --version || echo "AIDL 버전 확인 실패"
+        else
+            echo "❌ AIDL 도구를 찾을 수 없습니다."
+            echo "build-tools 디렉토리 내용 확인:"
+            ls -la $ANDROID_HOME/build-tools/30.0.3/ || echo "build-tools 디렉토리 없음"
+        fi
         
         # buildozer용 환경 변수 설정
         echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
@@ -75,8 +94,52 @@ jobs:
         echo "ANDROID_NDK_HOME=$HOME/android-sdk/ndk/21.4.7075529" >> $GITHUB_ENV
         echo "PATH=$PATH:$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$HOME/android-sdk/build-tools/30.0.3" >> $GITHUB_ENV
 
+    - name: 🔄 AIDL 도구 최종 검증 및 대안 설치
+      run: |
+        echo "=== AIDL 도구 최종 검증 시작 ==="
+        
+        # 환경 변수 다시 설정 (세션 간 변수 유지)
+        export ANDROID_HOME=$HOME/android-sdk
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
+        
+        # AIDL 도구 검색 및 검증
+        echo "1. 기본 위치 확인: $ANDROID_HOME/build-tools/30.0.3/aidl"
+        if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
+            echo "✅ AIDL 도구 발견되었습니다!"
+            chmod +x $ANDROID_HOME/build-tools/30.0.3/aidl
+            $ANDROID_HOME/build-tools/30.0.3/aidl --version || echo "버전 확인 실패, 하지만 파일은 존재"
+        else
+            echo "❌ 30.0.3에서 AIDL을 찾을 수 없습니다. 다른 버전 확인 중..."
+            
+            # 다른 build-tools 버전 확인
+            for version_dir in $ANDROID_HOME/build-tools/*/; do
+                if [ -f "${version_dir}aidl" ]; then
+                    echo "✅ AIDL 발견: ${version_dir}aidl"
+                    chmod +x ${version_dir}aidl
+                    # 심볼릭 링크 생성
+                    ln -sf ${version_dir}aidl $ANDROID_HOME/build-tools/30.0.3/aidl
+                    break
+                fi
+            done
+        fi
+        
+        # 마지막 최종 확인
+        if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
+            echo "🎉 AIDL 도구 준비 완료!"
+        else
+            echo "⚠️ AIDL 도구를 찾을 수 없습니다. 모든 build-tools 내용:"
+            find $ANDROID_HOME/build-tools -name "aidl" 2>/dev/null || echo "AIDL 도구가 전혀 없습니다."
+        fi
+
     - name: 📱 Buildozer 초기화 및 APK 빌드
       run: |
+        # 환경 변수 다시 설정
+        export ANDROID_HOME=$HOME/android-sdk
+        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        export ANDROID_NDK_HOME=$HOME/android-sdk/ndk/21.4.7075529
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
+        
         # buildozer.spec 파일 사용
         buildozer android ${{ github.event.inputs.build_type || 'debug' }}
 
