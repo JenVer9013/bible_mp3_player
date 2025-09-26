@@ -45,54 +45,50 @@ jobs:
         python -m pip install --upgrade pip
         pip install buildozer cython kivy[base] requests
 
-    - name: 📱 Android SDK 및 도구 설치
+    - name: 📱 GitHub Actions 기본 Android SDK 사용
+      uses: android-actions/setup-android@v3
+      with:
+        cmdline-tools-version: 8512546
+        log-accepted-android-sdk-licenses: false
+        
+    - name: 🔧 Android SDK 경로 및 도구 설정
       run: |
-        # Android SDK 설치
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O android-tools.zip
-        unzip -q android-tools.zip -d $HOME/android-sdk
+        # GitHub Actions에서 제공하는 기본 Android SDK 사용
+        export ANDROID_HOME=$ANDROID_SDK_ROOT
+        export ANDROID_SDK_HOME=$ANDROID_SDK_ROOT
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
         
-        # cmdline-tools 경로 수정 (latest 폴더로 이동)
-        mkdir -p $HOME/android-sdk/cmdline-tools/latest
-        mv $HOME/android-sdk/cmdline-tools/* $HOME/android-sdk/cmdline-tools/latest/ 2>/dev/null || true
+        echo "=== Android SDK 정보 ==="
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
         
-        # 환경 변수 설정
-        export ANDROID_HOME=$HOME/android-sdk
-        export ANDROID_SDK_ROOT=$HOME/android-sdk
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
+        # 필수 컴포넌트 설치
+        echo "=== 필수 Android 컴포넌트 설치 ==="
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529"
         
-        # 라이선스 디렉토리 생성
-        mkdir -p $ANDROID_HOME/licenses
+        # AIDL 도구 확인
+        echo "=== AIDL 도구 확인 ==="
+        find $ANDROID_HOME -name "aidl" -type f 2>/dev/null | head -5
         
-        # 모든 라이선스 자동 승인 (강제 승인)
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
-        echo "d975f751698a77b662f1254ddbeed3901e976f5a" > $ANDROID_HOME/licenses/intel-android-extra-license
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $ANDROID_HOME/licenses/android-googletv-license
-        echo "79120722343a6f314e0719f863036c702b0e6b2a" > $ANDROID_HOME/licenses/android-sdk-arm-dbt-license
-        echo "e9acab5b5fbb560a72cfaecce8946896ff6aab9d" > $ANDROID_HOME/licenses/mips-android-sysimage-license
-        echo "504667f4c0de7af1a06de9f4b1727b84351f2910" > $ANDROID_HOME/licenses/google-gdk-license
-        
-        # 필요한 패키지 설치 (라이선스 자동 승인과 함께)
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529"
-        
-        # AIDL 도구 확인 및 설치 검증
-        echo "=== AIDL 도구 확인 시작 ==="
         if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
             echo "✅ AIDL 도구 발견: $ANDROID_HOME/build-tools/30.0.3/aidl"
-            ls -la $ANDROID_HOME/build-tools/30.0.3/aidl
-            $ANDROID_HOME/build-tools/30.0.3/aidl --version || echo "AIDL 버전 확인 실패"
+            chmod +x $ANDROID_HOME/build-tools/30.0.3/aidl
         else
-            echo "❌ AIDL 도구를 찾을 수 없습니다."
-            echo "build-tools 디렉토리 내용 확인:"
-            ls -la $ANDROID_HOME/build-tools/30.0.3/ || echo "build-tools 디렉토리 없음"
+            echo "⚠️ 30.0.3 버전에 AIDL 없음. 다른 버전에서 복사 중..."
+            # 다른 build-tools에서 AIDL 찾아서 복사
+            AIDL_PATH=$(find $ANDROID_HOME/build-tools -name "aidl" -type f | head -1)
+            if [ -n "$AIDL_PATH" ]; then
+                echo "해결책: $AIDL_PATH를 30.0.3으로 복사"
+                cp "$AIDL_PATH" "$ANDROID_HOME/build-tools/30.0.3/aidl"
+                chmod +x "$ANDROID_HOME/build-tools/30.0.3/aidl"
+            fi
         fi
         
         # buildozer용 환경 변수 설정
-        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_NDK_HOME=$HOME/android-sdk/ndk/21.4.7075529" >> $GITHUB_ENV
-        echo "PATH=$PATH:$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$HOME/android-sdk/build-tools/30.0.3" >> $GITHUB_ENV
+        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
+        echo "PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3" >> $GITHUB_ENV
 
     - name: 🔄 AIDL 도구 최종 검증 및 대안 설치
       run: |
