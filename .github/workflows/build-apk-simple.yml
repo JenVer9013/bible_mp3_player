@@ -126,10 +126,24 @@ jobs:
         export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
         export ANDROID_SDK_ROOT=$ANDROID_HOME
 
-        # SDK 라이센스 수락 (모든 라이센스에 대해 y 응답)
+        # SDK 라이센스 수락 (buildozer가 사용하는 실제 경로들)
         if [ -d "$ANDROID_HOME" ]; then
             echo "기존 Android SDK 발견, 라이센스 수락 시도..."
-            (echo y; echo y; echo y; echo y; echo y; echo y) | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || echo "라이센스 수락 시도 완료"
+
+            # 여러 가능한 sdkmanager 경로에서 라이센스 수락 시도
+            SDKMANAGER_PATHS=(
+                "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+                "$ANDROID_HOME/tools/bin/sdkmanager"
+                "$ANDROID_HOME/cmdline-tools/bin/sdkmanager"
+            )
+
+            for SDKMANAGER in "${SDKMANAGER_PATHS[@]}"; do
+                if [ -f "$SDKMANAGER" ]; then
+                    echo "sdkmanager 발견: $SDKMANAGER"
+                    (yes | $SDKMANAGER --licenses) 2>/dev/null || echo "라이센스 수락 시도 완료 ($SDKMANAGER)"
+                    break
+                fi
+            done
         else
             echo "Android SDK가 아직 설치되지 않음 - buildozer가 자동 설치할 예정"
         fi
@@ -142,10 +156,29 @@ jobs:
         
         # buildozer 명령 실행 (단계별 디버깅)
         echo "buildozer android $BUILD_TYPE 실행 중..."
-        
+
         # 직접 실행하여 오류 상세 정보 확인
         set +e  # 오류에도 계속 진행
-        buildozer -v android $BUILD_TYPE > build_output.log 2>&1
+
+        # buildozer 백그라운드 실행으로 라이센스 수락 기회 제공
+        buildozer -v android $BUILD_TYPE > build_output.log 2>&1 &
+        BUILDOZER_PID=$!
+
+        # 10초 후 SDK가 다운로드되었는지 확인하고 라이센스 수락 시도
+        sleep 10
+        if [ -d "$ANDROID_HOME" ]; then
+            echo "빌드 중 SDK 감지됨, 라이센스 수락 시도..."
+            for SDKMANAGER in "$ANDROID_HOME/tools/bin/sdkmanager" "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"; do
+                if [ -f "$SDKMANAGER" ]; then
+                    echo "빌드 중 라이센스 수락: $SDKMANAGER"
+                    (yes | $SDKMANAGER --licenses) >/dev/null 2>&1 || true
+                    break
+                fi
+            done
+        fi
+
+        # buildozer 프로세스 완료 대기
+        wait $BUILDOZER_PID
         BUILD_EXIT_CODE=$?
         set -e
         
@@ -179,12 +212,27 @@ jobs:
             # 라이센스 관련 오류인지 확인하고 재시도
             if [ -f build_output.log ] && grep -q "license.*not accepted\|Accept.*y/N" build_output.log; then
                 echo "\n=== 라이센스 오류 감지 - 재시도 ==="
-                if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
-                    echo "Android SDK Manager로 라이센스 수락 재시도..."
-                    (yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses) 2>/dev/null || echo "라이센스 수락 재시도 완료"
 
-                    echo "라이센스 수락 후 buildozer 재실행..."
-                    buildozer android $BUILD_TYPE > build_output_retry.log 2>&1 && echo "✅ 재시도 성공!" || echo "❌ 재시도도 실패"
+                # 여러 가능한 sdkmanager 경로에서 라이센스 수락 재시도
+                RETRY_SDKMANAGER_PATHS=(
+                    "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+                    "$ANDROID_HOME/tools/bin/sdkmanager"
+                    "$ANDROID_HOME/cmdline-tools/bin/sdkmanager"
+                )
+
+                for RETRY_SDKMANAGER in "${RETRY_SDKMANAGER_PATHS[@]}"; do
+                    if [ -f "$RETRY_SDKMANAGER" ]; then
+                        echo "재시도용 sdkmanager 발견: $RETRY_SDKMANAGER"
+                        (yes | $RETRY_SDKMANAGER --licenses) 2>/dev/null || echo "라이센스 수락 재시도 완료 ($RETRY_SDKMANAGER)"
+
+                        echo "라이센스 수락 후 buildozer 재실행..."
+                        buildozer android $BUILD_TYPE > build_output_retry.log 2>&1 && echo "✅ 재시도 성공!" || echo "❌ 재시도도 실패"
+                        break
+                    fi
+                done
+
+                if [ ! -f "$RETRY_SDKMANAGER" ]; then
+                    echo "❌ 재시도용 sdkmanager를 찾을 수 없음"
                 fi
             fi
 
