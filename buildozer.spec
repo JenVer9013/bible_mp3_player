@@ -33,7 +33,7 @@ orientation = portrait
 
 # (str) Supported orientations
 # Valid options are: landscape, portrait, portrait-reverse or landscape-reverse
-orientation = portrait
+# orientation already set above at line 26
 
 [buildozer]
 
