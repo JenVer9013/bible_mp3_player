@@ -51,56 +51,164 @@ jobs:
         cmdline-tools-version: 8512546
         log-accepted-android-sdk-licenses: false
         
+    - name: 🔍 Android SDK 상태 디버깅 및 진단
+      run: |
+        echo "=== 초기 Android SDK 상태 확인 ==="
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+        echo "ANDROID_HOME 환경변수: $ANDROID_HOME"
+        
+        # 기본 SDK 구조 확인
+        echo "\n=== SDK 디렉토리 구조 ==="
+        ls -la $ANDROID_SDK_ROOT/ || echo "SDK 루트 디렉토리 없음"
+        
+        # cmdline-tools 확인
+        echo "\n=== cmdline-tools 확인 ==="
+        ls -la $ANDROID_SDK_ROOT/cmdline-tools/ 2>/dev/null || echo "cmdline-tools 디렉토리 없음"
+        ls -la $ANDROID_SDK_ROOT/cmdline-tools/latest/ 2>/dev/null || echo "cmdline-tools/latest 디렉토리 없음"
+        
+        # 기존 build-tools 확인
+        echo "\n=== 기존 build-tools 확인 ==="
+        ls -la $ANDROID_SDK_ROOT/build-tools/ 2>/dev/null || echo "build-tools 디렉토리 없음"
+        
+        # 기존 AIDL 도구 검색
+        echo "\n=== 기존 AIDL 도구 검색 ==="
+        find $ANDROID_SDK_ROOT -name "aidl" -type f 2>/dev/null || echo "AIDL 도구 없음"
+        
+        # 라이선스 상태 확인
+        echo "\n=== 라이선스 상태 확인 ==="
+        ls -la $ANDROID_SDK_ROOT/licenses/ 2>/dev/null || echo "라이선스 디렉토리 없음"
+
     - name: 🔧 Android SDK 경로 및 도구 설정
       run: |
-        # GitHub Actions에서 제공하는 기본 Android SDK 사용
+        # 환경 변수 설정
         export ANDROID_HOME=$ANDROID_SDK_ROOT
         export ANDROID_SDK_HOME=$ANDROID_SDK_ROOT
         export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
         
-        echo "=== Android SDK 정보 ==="
+        echo "=== 설정된 환경 변수 ==="
         echo "ANDROID_HOME: $ANDROID_HOME"
         echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+        echo "PATH: $PATH"
         
-        # 필수 컴포넌트 설치
-        echo "=== 필수 Android 컴포넌트 설치 ==="
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529"
-        
-        # AIDL 도구 확인
-        echo "=== AIDL 도구 확인 ==="
-        find $ANDROID_HOME -name "aidl" -type f 2>/dev/null | head -5
-        
-        if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
-            echo "✅ AIDL 도구 발견: $ANDROID_HOME/build-tools/30.0.3/aidl"
-            chmod +x $ANDROID_HOME/build-tools/30.0.3/aidl
+        # sdkmanager 사용 가능성 확인
+        echo "\n=== sdkmanager 사용 가능성 확인 ==="
+        if [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            echo "✅ sdkmanager 발견"
+            $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --version
         else
-            echo "⚠️ 30.0.3 버전에 AIDL 없음. 다른 버전에서 복사 중..."
-            # 다른 build-tools에서 AIDL 찾아서 복사
-            AIDL_PATH=$(find $ANDROID_HOME/build-tools -name "aidl" -type f | head -1)
-            if [ -n "$AIDL_PATH" ]; then
-                echo "해결책: $AIDL_PATH를 30.0.3으로 복사"
-                cp "$AIDL_PATH" "$ANDROID_HOME/build-tools/30.0.3/aidl"
+            echo "❌ sdkmanager 없음. 다른 위치 검색..."
+            find $ANDROID_HOME -name "sdkmanager" -type f 2>/dev/null | head -3
+        fi
+        
+        # 설치된 패키지 리스트 확인
+        echo "\n=== 설치된 패키지 확인 ==="
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list_installed || echo "sdkmanager list 실패"
+        
+        echo "\n=== 필수 컴포넌트 설치 시도 ==="
+        # 30.0.3 버전 명시적 설치
+        echo "30.0.3 build-tools 설치 시도..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3" || echo "30.0.3 설치 실패"
+        
+        echo "\nplatforms 설치 시도..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-30" || echo "platforms 설치 실패"
+        
+        echo "\nNDK 설치 시도..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;21.4.7075529" || echo "NDK 설치 실패"
+        
+        # 설치 후 상태 확인
+        echo "\n=== 설치 후 build-tools 상태 ==="
+        ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "build-tools 디렉토리 여전히 없음"
+        
+        # AIDL 도구 검색 및 설치
+        echo "\n=== AIDL 도구 검색 및 설정 ==="
+        AIDL_FOUND=false
+        
+        # 30.0.3에서 먼저 찾기
+        if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
+            echo "✅ AIDL 발견: 30.0.3 버전"
+            chmod +x $ANDROID_HOME/build-tools/30.0.3/aidl
+            AIDL_FOUND=true
+        else
+            echo "⚠️ 30.0.3에 AIDL 없음. 다른 버전 검색..."
+            
+            # 전체 검색
+            AIDL_PATHS=$(find $ANDROID_HOME -name "aidl" -type f 2>/dev/null)
+            echo "AIDL 도구 전체 경로:"
+            echo "$AIDL_PATHS"
+            
+            # 첫 번째 AIDL 복사
+            if [ -n "$AIDL_PATHS" ]; then
+                FIRST_AIDL=$(echo "$AIDL_PATHS" | head -1)
+                echo "\n해결책: $FIRST_AIDL을 30.0.3으로 복사"
+                mkdir -p "$ANDROID_HOME/build-tools/30.0.3"
+                cp "$FIRST_AIDL" "$ANDROID_HOME/build-tools/30.0.3/aidl"
                 chmod +x "$ANDROID_HOME/build-tools/30.0.3/aidl"
+                AIDL_FOUND=true
             fi
         fi
         
+        # 최종 AIDL 상태
+        if [ "$AIDL_FOUND" = "true" ]; then
+            echo "\n🎉 AIDL 도구 준비 완료!"
+            ls -la $ANDROID_HOME/build-tools/30.0.3/aidl
+        else
+            echo "\n❌ AIDL 도구를 찾을 수 없습니다."
+        fi
+        
+        # buildozer가 기대하는 표준 경로로 심볼릭 링크 생성
+        echo "\n=== buildozer 표준 경로 설정 ==="
+        sudo mkdir -p /opt/android-sdk-linux
+        sudo ln -sf $ANDROID_HOME/* /opt/android-sdk-linux/ 2>/dev/null || true
+        sudo chown -R $USER:$USER /opt/android-sdk-linux/ || true
+        
         # buildozer용 환경 변수 설정
-        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-        echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
-        echo "PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3" >> $GITHUB_ENV
+        echo "ANDROID_HOME=/opt/android-sdk-linux" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=/opt/android-sdk-linux" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=/opt/android-sdk-linux/ndk/21.4.7075529" >> $GITHUB_ENV
+        echo "PATH=$PATH:/opt/android-sdk-linux/cmdline-tools/latest/bin:/opt/android-sdk-linux/platform-tools:/opt/android-sdk-linux/build-tools/30.0.3" >> $GITHUB_ENV
+        
+        # 표준 경로 상태 확인
+        echo "\n=== 표준 경로 상태 확인 ==="
+        ls -la /opt/android-sdk-linux/ 2>/dev/null || echo "심볼릭 링크 생성 실패"
+
+    - name: 📱 Android SDK 라이선스 강제 승인
+      run: |
+        echo "=== Android SDK 라이선스 강제 승인 ==="
+        
+        # 표준 경로로 라이선스 디렉토리 생성
+        sudo mkdir -p /opt/android-sdk-linux/licenses
+        
+        # 모든 라이선스 강제 승인 (최신 해시 포함)
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" | sudo tee /opt/android-sdk-linux/licenses/android-sdk-license > /dev/null
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" | sudo tee /opt/android-sdk-linux/licenses/android-sdk-preview-license > /dev/null
+        echo "d975f751698a77b662f1254ddbeed3901e976f5a" | sudo tee /opt/android-sdk-linux/licenses/intel-android-extra-license > /dev/null
+        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" | sudo tee /opt/android-sdk-linux/licenses/android-googletv-license > /dev/null
+        echo "79120722343a6f314e0719f863036c702b0e6b2a" | sudo tee /opt/android-sdk-linux/licenses/android-sdk-arm-dbt-license > /dev/null
+        echo "e9acab5b5fbb560a72cfaecce8946896ff6aab9d" | sudo tee /opt/android-sdk-linux/licenses/mips-android-sysimage-license > /dev/null
+        echo "504667f4c0de7af1a06de9f4b1727b84351f2910" | sudo tee /opt/android-sdk-linux/licenses/google-gdk-license > /dev/null
+        
+        # 2024년 이후 추가 라이선스 (새로운 build-tools 대응)
+        echo "481e45a93e7a0fa4998f65bb8bce0d9e7a2ad6e8" | sudo tee -a /opt/android-sdk-linux/licenses/android-sdk-license > /dev/null
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" | sudo tee -a /opt/android-sdk-linux/licenses/android-sdk-license > /dev/null
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" | sudo tee -a /opt/android-sdk-linux/licenses/android-sdk-license > /dev/null
+        
+        # 라이선스 파일 권한 설정
+        sudo chown -R $USER:$USER /opt/android-sdk-linux/licenses/
+        
+        echo "✅ 라이선스 승인 완료"
+        ls -la /opt/android-sdk-linux/licenses/
 
     - name: 🔄 AIDL 도구 최종 검증 및 대안 설치
       run: |
         echo "=== AIDL 도구 최종 검증 시작 ==="
         
-        # 환경 변수 다시 설정 (세션 간 변수 유지)
-        export ANDROID_HOME=$HOME/android-sdk
-        export ANDROID_SDK_ROOT=$HOME/android-sdk
+        # 환경 변수 다시 설정 (표준 경로 사용)
+        export ANDROID_HOME=/opt/android-sdk-linux
+        export ANDROID_SDK_ROOT=/opt/android-sdk-linux
         export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
         
         # AIDL 도구 검색 및 검증
-        echo "1. 기본 위치 확인: $ANDROID_HOME/build-tools/30.0.3/aidl"
+        echo "1. 표준 위치 확인: $ANDROID_HOME/build-tools/30.0.3/aidl"
         if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
             echo "✅ AIDL 도구 발견되었습니다!"
             chmod +x $ANDROID_HOME/build-tools/30.0.3/aidl
@@ -113,8 +221,10 @@ jobs:
                 if [ -f "${version_dir}aidl" ]; then
                     echo "✅ AIDL 발견: ${version_dir}aidl"
                     chmod +x ${version_dir}aidl
-                    # 심볼릭 링크 생성
-                    ln -sf ${version_dir}aidl $ANDROID_HOME/build-tools/30.0.3/aidl
+                    # 30.0.3 디렉토리 생성 후 복사
+                    mkdir -p $ANDROID_HOME/build-tools/30.0.3/
+                    cp ${version_dir}aidl $ANDROID_HOME/build-tools/30.0.3/aidl
+                    chmod +x $ANDROID_HOME/build-tools/30.0.3/aidl
                     break
                 fi
             done
@@ -123,9 +233,10 @@ jobs:
         # 마지막 최종 확인
         if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
             echo "🎉 AIDL 도구 준비 완료!"
+            ls -la $ANDROID_HOME/build-tools/30.0.3/aidl
         else
             echo "⚠️ AIDL 도구를 찾을 수 없습니다. 모든 build-tools 내용:"
-            find $ANDROID_HOME/build-tools -name "aidl" 2>/dev/null || echo "AIDL 도구가 전혀 없습니다."
+            find $ANDROID_HOME -name "aidl" 2>/dev/null || echo "AIDL 도구가 전혀 없습니다."
         fi
 
     - name: 📱 Buildozer 초기화 및 APK 빌드

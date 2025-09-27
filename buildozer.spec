@@ -22,5 +22,17 @@ android.api = 30
 android.minapi = 21
 android.ndk_api = 21
 
-# build-tools 버전 명시
+# build-tools 버전 강제 지정 (36.1 버전 요청 방지)
 android.build_tools_version = 30.0.3
+android.gradle_version = 7.4.2
+android.gradle_plugin_version = 7.4.2
+
+# SDK 경로 강제 지정
+android.sdk_path = /opt/android-sdk-linux
+android.ndk_path = /opt/android-sdk-linux/ndk/21.4.7075529
+
+# AIDL 및 기타 도구 경로 명시
+android.aidl = /opt/android-sdk-linux/build-tools/30.0.3/aidl
+android.aapt = /opt/android-sdk-linux/build-tools/30.0.3/aapt
+android.dx = /opt/android-sdk-linux/build-tools/30.0.3/dx
+android.zipalign = /opt/android-sdk-linux/build-tools/30.0.3/zipalign
