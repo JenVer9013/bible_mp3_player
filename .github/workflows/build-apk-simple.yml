@@ -223,10 +223,44 @@ jobs:
                 for RETRY_SDKMANAGER in "${RETRY_SDKMANAGER_PATHS[@]}"; do
                     if [ -f "$RETRY_SDKMANAGER" ]; then
                         echo "재시도용 sdkmanager 발견: $RETRY_SDKMANAGER"
-                        (yes | $RETRY_SDKMANAGER --licenses) 2>/dev/null || echo "라이센스 수락 재시도 완료 ($RETRY_SDKMANAGER)"
+
+                        # 라이센스 수락 전 상태 확인
+                        echo "라이센스 수락 전 상태 확인..."
+                        $RETRY_SDKMANAGER --list | grep -A5 -B5 "licenses available" 2>/dev/null || echo "라이센스 상태 확인 실패"
+
+                        # 라이센스 수락 실행
+                        echo "라이센스 수락 실행 중..."
+                        (yes | $RETRY_SDKMANAGER --licenses) 2>&1 | head -20 || echo "라이센스 수락 시도 완료"
+
+                        # 라이센스 수락 후 상태 확인
+                        echo "라이센스 수락 후 상태 확인..."
+                        $RETRY_SDKMANAGER --list | grep -A5 -B5 "licenses available" 2>/dev/null || echo "라이센스 상태 재확인 실패"
 
                         echo "라이센스 수락 후 buildozer 재실행..."
-                        buildozer android $BUILD_TYPE > build_output_retry.log 2>&1 && echo "✅ 재시도 성공!" || echo "❌ 재시도도 실패"
+                        buildozer android $BUILD_TYPE > build_output_retry.log 2>&1
+                        RETRY_EXIT_CODE=$?
+
+                        if [ $RETRY_EXIT_CODE -eq 0 ]; then
+                            echo "✅ 재시도 성공!"
+                        else
+                            echo "❌ 재시도도 실패 (exit code: $RETRY_EXIT_CODE)"
+                            echo "\n=== 재시도 로그 내용 ==="
+                            if [ -f build_output_retry.log ]; then
+                                cat build_output_retry.log
+                                echo "\n=== 재시도 로그 끝 ==="
+                            fi
+
+                            # 추가 진단 정보
+                            echo "\n=== 재시도 실패 후 진단 ==="
+                            echo "Android SDK 디렉토리 구조:"
+                            find $ANDROID_HOME -type d -maxdepth 3 2>/dev/null | head -10 || echo "SDK 디렉토리 구조 확인 실패"
+
+                            echo "\n설치된 패키지 확인:"
+                            $RETRY_SDKMANAGER --list_installed 2>/dev/null | head -10 || echo "설치된 패키지 확인 실패"
+
+                            echo "\nbuildozer 디렉토리 상태:"
+                            ls -la .buildozer/ 2>/dev/null || echo "buildozer 디렉토리 없음"
+                        fi
                         break
                     fi
                 done
