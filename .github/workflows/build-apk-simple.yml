@@ -121,6 +121,19 @@ jobs:
         echo "\nbuildozer 지원 플랫폼:"
         buildozer android --help 2>&1 | head -5 || echo "android 플랫폼 도움말 실패"
         
+        # Android SDK 라이센스 수락
+        echo "\n=== Android SDK 라이센스 수락 ==="
+        export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
+        export ANDROID_SDK_ROOT=$ANDROID_HOME
+
+        # SDK 라이센스 수락 (모든 라이센스에 대해 y 응답)
+        if [ -d "$ANDROID_HOME" ]; then
+            echo "기존 Android SDK 발견, 라이센스 수락 시도..."
+            (echo y; echo y; echo y; echo y; echo y; echo y) | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || echo "라이센스 수락 시도 완료"
+        else
+            echo "Android SDK가 아직 설치되지 않음 - buildozer가 자동 설치할 예정"
+        fi
+
         BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
         echo "\n=== APK 빌드 시작 (BUILD_TYPE: $BUILD_TYPE) ==="
         
@@ -140,18 +153,41 @@ jobs:
         
         if [ $BUILD_EXIT_CODE -eq 0 ]; then
             echo "✅ buildozer 빌드 성공!"
+            echo "\n=== 성공 로그 마지막 20줄 ==="
+            if [ -f build_output.log ]; then
+                tail -20 build_output.log
+            fi
         else
             echo "❌ buildozer 빌드 실패! (exit code: $BUILD_EXIT_CODE)"
             
             echo "\n=== 빌드 출력 로그 ==="
             if [ -f build_output.log ]; then
-                echo "빌드 출력 로그 크기: $(wc -l < build_output.log) 줄"
-                echo "\n--- 마지막 100줄 ---"
-                tail -100 build_output.log
+                LOG_SIZE=$(wc -l < build_output.log)
+                echo "빌드 출력 로그 크기: $LOG_SIZE 줄"
+                
+                if [ $LOG_SIZE -gt 0 ]; then
+                    echo "\n--- 전체 로그 내용 ---"
+                    cat build_output.log
+                    echo "\n--- 로그 끝 ---"
+                else
+                    echo "build_output.log 파일이 비어있습니다."
+                fi
             else
                 echo "build_output.log 파일이 생성되지 않았습니다."
             fi
-            
+
+            # 라이센스 관련 오류인지 확인하고 재시도
+            if [ -f build_output.log ] && grep -q "license.*not accepted\|Accept.*y/N" build_output.log; then
+                echo "\n=== 라이센스 오류 감지 - 재시도 ==="
+                if [ -d "$ANDROID_HOME/cmdline-tools/latest/bin" ]; then
+                    echo "Android SDK Manager로 라이센스 수락 재시도..."
+                    (yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses) 2>/dev/null || echo "라이센스 수락 재시도 완료"
+
+                    echo "라이센스 수락 후 buildozer 재실행..."
+                    buildozer android $BUILD_TYPE > build_output_retry.log 2>&1 && echo "✅ 재시도 성공!" || echo "❌ 재시도도 실패"
+                fi
+            fi
+
             echo "\n=== 다른 로그 파일 검색 ==="
             find . -name "*.log" -type f 2>/dev/null | head -10 || echo "로그 파일 없음"
             
