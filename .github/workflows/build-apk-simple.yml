@@ -99,7 +99,8 @@ jobs:
         
         # 라이선스 자동 승인으로 빌드 실행
         echo "=== APK 빌드 (라이선스 자동 승인) ==="
-        timeout 3600 bash -c 'yes | buildozer -v android ${{ github.event.inputs.build_type || "debug" }}' || {
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
+        timeout 3600 bash -c "yes | buildozer -v android $BUILD_TYPE" || {
             echo "❌ Buildozer 빌드 실패!"
             echo "=== 마지막 30줄 로그 ==="
             tail -30 ~/.buildozer/logs/* 2>/dev/null || echo "로그 파일 없음"
