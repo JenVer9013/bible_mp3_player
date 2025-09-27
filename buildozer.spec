@@ -91,8 +91,7 @@ android.arch = armeabi-v7a
 
 # Android specific
 
-# (bool) Indicate if the application should be fullscreen or not
-fullscreen = 0
+# fullscreen already set above at line 49
 
 # (string) Presplash background color (for android toolchain)
 # Supported formats are: #RRGGBB #AARRGGBB or one of the following names:
@@ -217,8 +216,7 @@ android.accept_sdk_license = True
 # (bool) Copy library instead of making a libpymodules.so
 #android.copy_libs = 1
 
-# (str) The Android arch to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
-android.arch = armeabi-v7a
+# android.arch already set above at line 73
 
 # (int) overrides automatic versionCode computation (used in build.gradle)
 # this is not the same as app version and should only be edited if you know what you're doing
