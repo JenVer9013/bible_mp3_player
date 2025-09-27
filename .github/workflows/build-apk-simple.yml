@@ -1,0 +1,99 @@
+# 2024년 8월 테스트된 성공적인 Kivy APK 빌드 워크플로우
+# 출처: https://gist.github.com/zl475505/25245e8d28b13b3273e8bae1a63c4af2
+name: 🎵 성경 MP3 플레이어 APK 빌드 (간단 버전)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: '빌드 타입을 선택하세요'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build-android:
+    name: 🤖 Android APK 빌드
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 소스코드 체크아웃
+      uses: actions/checkout@v4
+
+    - name: 🔧 Buildozer 의존성 설치
+      run: |
+        echo "=== 시스템 의존성 설치 ==="
+        sudo apt update
+        sudo apt install -y git zip unzip python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
+        
+        echo "=== Python 패키지 설치 ==="
+        pip install --user --upgrade Cython virtualenv
+        pip install --user --upgrade buildozer
+        
+        echo "=== 프로젝트 의존성 설치 ==="
+        if [ -f requirements.txt ]; then
+            pip install --user -r requirements.txt
+        fi
+
+    - name: ☕ Java 경로 설정 (중요!)
+      run: |
+        echo "=== Java 환경 설정 ==="
+        export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+        sudo update-java-alternatives --set $JAVA_HOME
+        export PATH=$JAVA_HOME/bin:$PATH
+        
+        echo "Java 버전 확인:"
+        java -version
+        
+        # 환경 변수 설정
+        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+        echo "PATH=$JAVA_HOME/bin:$PATH" >> $GITHUB_ENV
+
+    - name: 📱 APK 빌드 실행
+      run: |
+        echo "=== Buildozer APK 빌드 시작 ==="
+        
+        # buildozer.spec이 없으면 초기화
+        if [ ! -f buildozer.spec ]; then
+            echo "buildozer.spec 파일이 없습니다. 초기화합니다..."
+            buildozer init
+        fi
+        
+        # 라이선스 자동 승인으로 빌드 실행
+        echo "=== APK 빌드 (라이선스 자동 승인) ==="
+        yes | buildozer -v android ${{ github.event.inputs.build_type || 'debug' }}
+
+    - name: 📂 빌드 결과 확인
+      run: |
+        echo "=== 빌드 결과 확인 ==="
+        ls -la bin/ || echo "bin 폴더가 없습니다."
+        find . -name "*.apk" -type f || echo "APK 파일을 찾을 수 없습니다."
+
+    - name: 🚀 APK 파일 업로드
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: bible-mp3-player-${{ github.event.inputs.build_type || 'debug' }}-apk-simple
+        path: bin/*.apk
+
+    - name: ✅ 빌드 완료 알림
+      if: success()
+      run: |
+        echo "🎉 APK 빌드가 성공적으로 완료되었습니다!"
+        echo "📱 APK 파일을 Artifacts에서 다운로드할 수 있습니다."
+        
+    - name: ❌ 빌드 실패 시 디버깅 정보
+      if: failure()
+      run: |
+        echo "❌ 빌드가 실패했습니다. 디버깅 정보:"
+        echo "=== buildozer.spec 내용 ==="
+        cat buildozer.spec || echo "buildozer.spec 파일 없음"
+        echo "=== .buildozer 로그 ==="
+        find .buildozer -name "*.log" -exec cat {} \; 2>/dev/null || echo "buildozer 로그 없음"
