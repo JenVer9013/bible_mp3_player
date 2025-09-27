@@ -29,11 +29,11 @@ jobs:
       with:
         python-version: '3.8'
 
-    - name: ☕ Java 8 설정
-      uses: actions/setup-java@v3
+    - name: ☕ Java 17 설정 (Android SDK 호환성)
+      uses: actions/setup-java@v4
       with:
-        distribution: 'adopt'
-        java-version: '8'
+        distribution: 'temurin'
+        java-version: '17'
 
     - name: 📦 시스템 의존성 설치
       run: |
@@ -48,8 +48,13 @@ jobs:
     - name: 📱 GitHub Actions 기본 Android SDK 사용
       uses: android-actions/setup-android@v3
       with:
-        cmdline-tools-version: 8512546
-        log-accepted-android-sdk-licenses: false
+        cmdline-tools-version: 11076708
+        log-accepted-android-sdk-licenses: true
+        packages: |
+          platform-tools
+          build-tools;30.0.3
+          platforms;android-30
+          ndk;21.4.7075529
         
     - name: 🔍 Android SDK 상태 디버깅 및 진단
       run: |
