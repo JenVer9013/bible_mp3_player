@@ -97,29 +97,73 @@ jobs:
             buildozer init
         fi
         
-        # APK 빌드 실행 (라이선스 자동 승인 설정됨)
-        echo "=== APK 빌드 시작 ==="
-        BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
+        # buildozer 기본 테스트
+        echo "=== buildozer 기본 테스트 ==="
         
-        # buildozer 로그 디렉토리 생성
+        # buildozer 설치 확인
+        echo "빌드자 설치 상태:"
+        which buildozer || echo "buildozer 명령을 찾을 수 없음"
+        buildozer --version || echo "buildozer 버전 확인 실패"
+        
+        # buildozer 도움말 확인
+        echo "\nbuildozer 도움말 테스트:"
+        buildozer --help | head -10 || echo "buildozer 도움말 실패"
+        
+        # PATH 확인
+        echo "\n현재 PATH:"
+        echo $PATH
+        
+        # Python 패키지 확인
+        echo "\n설치된 Python 패키지:"
+        pip list | grep -E "(buildozer|cython|kivy)" || echo "관련 패키지 없음"
+        
+        # 지원되는 플랫폼 확인
+        echo "\nbuildozer 지원 플랫폼:"
+        buildozer android --help 2>&1 | head -5 || echo "android 플랫폼 도움말 실패"
+        
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'debug' }}"
+        echo "\n=== APK 빌드 시작 (BUILD_TYPE: $BUILD_TYPE) ==="
+        
+        # 빌드 전 로그 디렉토리 생성
         mkdir -p .buildozer/logs
         
-        # buildozer 실행 (yes 명령 없이)
+        # buildozer 명령 실행 (단계별 디버깅)
         echo "buildozer android $BUILD_TYPE 실행 중..."
-        timeout 3600 buildozer -v android $BUILD_TYPE 2>&1 | tee .buildozer/logs/build.log || {
-            echo "❌ Buildozer 빌드 실패!"
-            echo "=== 빌드 로그 마지막 50줄 ==="
-            if [ -f .buildozer/logs/build.log ]; then
-                tail -50 .buildozer/logs/build.log
+        
+        # 직접 실행하여 오류 상세 정보 확인
+        set +e  # 오류에도 계속 진행
+        buildozer -v android $BUILD_TYPE > build_output.log 2>&1
+        BUILD_EXIT_CODE=$?
+        set -e
+        
+        echo "\n=== buildozer 종료 (exit code: $BUILD_EXIT_CODE) ==="
+        
+        if [ $BUILD_EXIT_CODE -eq 0 ]; then
+            echo "✅ buildozer 빌드 성공!"
+        else
+            echo "❌ buildozer 빌드 실패! (exit code: $BUILD_EXIT_CODE)"
+            
+            echo "\n=== 빌드 출력 로그 ==="
+            if [ -f build_output.log ]; then
+                echo "빌드 출력 로그 크기: $(wc -l < build_output.log) 줄"
+                echo "\n--- 마지막 100줄 ---"
+                tail -100 build_output.log
             else
-                echo "로그 파일을 찾을 수 없습니다."
-                echo "=== 현재 디렉토리 내용 ==="
-                find . -name "*.log" -type f 2>/dev/null | head -10 || echo "로그 파일 없음"
-                echo "=== .buildozer 디렉토리 내용 ==="
-                ls -la .buildozer/ 2>/dev/null || echo ".buildozer 디렉토리 없음"
+                echo "build_output.log 파일이 생성되지 않았습니다."
             fi
-            exit 1
-        }
+            
+            echo "\n=== 다른 로그 파일 검색 ==="
+            find . -name "*.log" -type f 2>/dev/null | head -10 || echo "로그 파일 없음"
+            
+            echo "\n=== .buildozer 디렉토리 확인 ==="
+            if [ -d .buildozer ]; then
+                find .buildozer -type f -name "*.log" 2>/dev/null | head -5 || echo ".buildozer 내 로그 파일 없음"
+            else
+                echo ".buildozer 디렉토리가 생성되지 않았습니다."
+            fi
+            
+            exit $BUILD_EXIT_CODE
+        fi
 
     - name: 📂 빌드 결과 확인
       run: |
