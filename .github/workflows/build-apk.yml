@@ -63,11 +63,15 @@ jobs:
         mkdir -p $ANDROID_HOME/cmdline-tools/latest
         mv $ANDROID_HOME/cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/ 2>/dev/null || true
         
-        # 라이선스 자동 승인
+        # 라이선스 자동 승인 (모든 버전 대응)
         echo "SDK 라이선스 승인 중..."
         mkdir -p $ANDROID_HOME/licenses
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
         echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+        # 36.1.0 및 신규 버전 대응
+        echo "481e45a93e7a0fa4998f65bb8bce0d9e7a2ad6e8" >> $ANDROID_HOME/licenses/android-sdk-license
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_HOME/licenses/android-sdk-license
+        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $ANDROID_HOME/licenses/android-googletv-license
         
         # 필수 컴포넌트 설치
         echo "필수 SDK 컴포넌트 설치 중..."
@@ -76,8 +80,15 @@ jobs:
         # Java 버전 확인
         echo "Java 버전: $(java -version 2>&1 | head -1)"
         
-        # SDK 컴포넌트 설치
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;30.0.3" "platforms;android-30" "ndk;21.4.7075529" || echo "SDK 설치 실패"
+        # SDK 컴포넌트 설치 (모든 필요 버전 포함)
+        echo "기본 컴포넌트 설치..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-30" "ndk;21.4.7075529" || echo "기본 SDK 설치 실패"
+        
+        echo "build-tools 30.0.3 설치..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;30.0.3" || echo "30.0.3 설치 실패"
+        
+        echo "build-tools 36.1.0 설치 (백업용)..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;36.1.0" || echo "36.1.0 설치 실패 - 라이선스 문제일 수 있음"
         
         # 설치 확인
         echo "\n=== 설치 결과 확인 ==="
@@ -279,13 +290,38 @@ jobs:
 
     - name: 📱 Buildozer 초기화 및 APK 빌드
       run: |
-        # 환경 변수 다시 설정
+        echo "=== Buildozer APK 빌드 시작 ==="
+        
+        # 환경 변수 설정
         export ANDROID_HOME=$HOME/android-sdk
         export ANDROID_SDK_ROOT=$HOME/android-sdk
         export ANDROID_NDK_HOME=$HOME/android-sdk/ndk/21.4.7075529
         export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
         
-        # buildozer.spec 파일 사용
+        # buildozer 강제 설정
+        export BUILDOZER_BUILD_TOOLS_VERSION=30.0.3
+        export BUILDOZER_ANDROID_API=30
+        export BUILDOZER_ANDROID_NDK_API=21
+        
+        # AIDL 도구 경로 강제 지정
+        if [ -f "$ANDROID_HOME/build-tools/30.0.3/aidl" ]; then
+            export BUILDOZER_ANDROID_AIDL=$ANDROID_HOME/build-tools/30.0.3/aidl
+            echo "✅ AIDL 도구 경로: $BUILDOZER_ANDROID_AIDL"
+        elif [ -f "$ANDROID_HOME/build-tools/36.1.0/aidl" ]; then
+            export BUILDOZER_ANDROID_AIDL=$ANDROID_HOME/build-tools/36.1.0/aidl
+            echo "✅ AIDL 도구 경로: $BUILDOZER_ANDROID_AIDL (36.1.0에서 찾음)"
+        else
+            echo "⚠️ AIDL 도구를 찾을 수 없음"
+        fi
+        
+        # 현재 상태 확인
+        echo "\n=== 빌드 환경 확인 ==="
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "BUILD_TOOLS: $(ls $ANDROID_HOME/build-tools/ 2>/dev/null | tr '\n' ' ')"
+        echo "Java: $(java -version 2>&1 | head -1)"
+        
+        # buildozer APK 빌드 실행
+        echo "\n=== buildozer 실행 ==="
         buildozer android ${{ github.event.inputs.build_type || 'debug' }}
 
     - name: 📂 빌드 결과 확인
