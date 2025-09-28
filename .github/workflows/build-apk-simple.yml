@@ -230,7 +230,17 @@ jobs:
 
                         # 라이센스 수락 실행
                         echo "라이센스 수락 실행 중..."
-                        (yes | $RETRY_SDKMANAGER --licenses) 2>&1 | head -20 || echo "라이센스 수락 시도 완료"
+                        LICENSE_OUTPUT_FILE="license_output.log"
+                        (yes | $RETRY_SDKMANAGER --licenses) > $LICENSE_OUTPUT_FILE 2>&1
+                        LICENSE_EXIT_CODE=$?
+
+                        echo "라이센스 수락 명령 결과: exit code $LICENSE_EXIT_CODE"
+                        if [ -f $LICENSE_OUTPUT_FILE ]; then
+                            echo "라이센스 수락 출력 (처음 30줄):"
+                            head -30 $LICENSE_OUTPUT_FILE
+                            echo "라이센스 수락 출력 (마지막 10줄):"
+                            tail -10 $LICENSE_OUTPUT_FILE
+                        fi
 
                         # 라이센스 수락 후 상태 확인
                         echo "라이센스 수락 후 상태 확인..."
@@ -244,10 +254,19 @@ jobs:
                             echo "✅ 재시도 성공!"
                         else
                             echo "❌ 재시도도 실패 (exit code: $RETRY_EXIT_CODE)"
-                            echo "\n=== 재시도 로그 내용 ==="
+                            echo ""
+                            echo "=== 재시도 로그 내용 ==="
                             if [ -f build_output_retry.log ]; then
+                                echo "재시도 로그 파일 크기: $(wc -l < build_output_retry.log) 줄"
+                                echo ""
+                                echo "--- 재시도 로그 시작 ---"
                                 cat build_output_retry.log
-                                echo "\n=== 재시도 로그 끝 ==="
+                                echo ""
+                                echo "--- 재시도 로그 끝 ---"
+                            else
+                                echo "build_output_retry.log 파일이 생성되지 않았습니다."
+                                echo "현재 디렉토리의 로그 파일들:"
+                                ls -la *.log 2>/dev/null || echo "로그 파일 없음"
                             fi
 
                             # 추가 진단 정보
