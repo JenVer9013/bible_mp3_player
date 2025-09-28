@@ -293,6 +293,13 @@ jobs:
                         echo "AIDL 도구 확인:"
                         find "$ANDROID_HOME" -name "aidl" -type f 2>/dev/null || echo "AIDL 도구 없음"
 
+                        # 전체 Android SDK 상태 확인
+                        echo "전체 Android SDK 디렉토리 구조:"
+                        find "$ANDROID_HOME" -maxdepth 3 -type d 2>/dev/null | head -20 || echo "SDK 구조 확인 실패"
+
+                        echo "설치된 패키지 목록:"
+                        $RETRY_SDKMANAGER --list_installed 2>/dev/null | head -20 || echo "설치 패키지 확인 실패"
+
                         echo "라이센스 수락 후 buildozer 재실행..."
                         set +e  # buildozer 재실행 오류에도 계속 진행
                         buildozer android $BUILD_TYPE > build_output_retry.log 2>&1
@@ -380,6 +387,32 @@ jobs:
                 echo ".buildozer 디렉토리가 생성되지 않았습니다."
             fi
             
+            # 강제로 모든 로그 출력 (에러와 관계없이)
+            echo ""
+            echo "========================="
+            echo "FORCE LOG OUTPUT START"
+            echo "========================="
+
+            echo "모든 로그 파일 목록:"
+            ls -la *.log 2>/dev/null || echo "로그 파일 목록 없음"
+
+            echo ""
+            echo "--- LICENSE LOG FORCE OUTPUT ---"
+            cat license_output.log 2>/dev/null || echo "license_output.log 없음"
+
+            echo ""
+            echo "--- RETRY LOG FORCE OUTPUT ---"
+            cat build_output_retry.log 2>/dev/null || echo "build_output_retry.log 없음"
+
+            echo ""
+            echo "--- ORIGINAL LOG LAST 100 LINES ---"
+            tail -100 build_output.log 2>/dev/null || echo "build_output.log 없음"
+
+            echo ""
+            echo "========================="
+            echo "FORCE LOG OUTPUT END"
+            echo "========================="
+
             exit $BUILD_EXIT_CODE
         fi
 
