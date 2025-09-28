@@ -162,6 +162,10 @@ jobs:
         # 직접 실행하여 오류 상세 정보 확인
         set +e  # 오류에도 계속 진행
 
+        # buildozer clean 후 실행 (캐시 초기화)
+        echo "buildozer clean 실행 중..."
+        buildozer android clean > clean_output.log 2>&1 || echo "clean 완료"
+
         # buildozer 백그라운드 실행으로 라이센스 수락 기회 제공
         buildozer -v android $BUILD_TYPE > build_output.log 2>&1 &
         BUILDOZER_PID=$!
