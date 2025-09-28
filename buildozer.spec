@@ -166,7 +166,8 @@ android.ndk_api = 21
 #android.ndk_path =
 
 # (str) Android SDK directory (if empty, it will be automatically downloaded.)
-#android.sdk_path =
+# GitHub Actions에서 사전 설치된 SDK 사용
+android.sdk_path = {ANDROID_HOME}
 
 # (str) ANT directory (if empty, it will be automatically downloaded.)
 #android.ant_path =
