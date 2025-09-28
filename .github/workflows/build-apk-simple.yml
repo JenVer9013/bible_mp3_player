@@ -273,6 +273,26 @@ jobs:
                         echo "라이센스 수락 후 상태 확인..."
                         $RETRY_SDKMANAGER --list | grep -A5 -B5 "licenses available" 2>/dev/null || echo "라이센스 상태 재확인 실패"
 
+                        # 필수 build-tools 설치
+                        echo "필수 Android 컴포넌트 설치 중..."
+                        echo "설치 전 build-tools 디렉토리 확인:"
+                        ls -la "$ANDROID_HOME/build-tools/" 2>/dev/null || echo "build-tools 디렉토리 없음"
+
+                        # 라이센스가 수락된 상태에서 필수 패키지 설치 (API 30 기준)
+                        (yes | $RETRY_SDKMANAGER "build-tools;30.0.3") 2>&1 | head -20 || echo "build-tools 30.0.3 설치 시도 완료"
+                        (yes | $RETRY_SDKMANAGER "platforms;android-30") 2>&1 | head -15 || echo "platform android-30 설치 시도 완료"
+                        (yes | $RETRY_SDKMANAGER "platform-tools") 2>&1 | head -10 || echo "platform-tools 설치 시도 완료"
+
+                        # 추가로 최신 build-tools도 설치 시도
+                        (yes | $RETRY_SDKMANAGER "build-tools;34.0.0") 2>&1 | head -10 || echo "최신 build-tools 설치 시도 완료"
+
+                        echo "설치 후 build-tools 디렉토리 확인:"
+                        ls -la "$ANDROID_HOME/build-tools/" 2>/dev/null || echo "build-tools 여전히 없음"
+
+                        # AIDL 도구 확인
+                        echo "AIDL 도구 확인:"
+                        find "$ANDROID_HOME" -name "aidl" -type f 2>/dev/null || echo "AIDL 도구 없음"
+
                         echo "라이센스 수락 후 buildozer 재실행..."
                         set +e  # buildozer 재실행 오류에도 계속 진행
                         buildozer android $BUILD_TYPE > build_output_retry.log 2>&1
