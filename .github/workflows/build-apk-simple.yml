@@ -125,6 +125,8 @@ jobs:
         echo "\n=== Android SDK 라이센스 수락 ==="
         export ANDROID_HOME=$HOME/.buildozer/android/platform/android-sdk
         export ANDROID_SDK_ROOT=$ANDROID_HOME
+        export ANDROID_SDK_ACCEPT_LICENSE=y
+        export ANDROID_SDK_AUTO_ACCEPT=yes
 
         # SDK 라이센스 수락 (buildozer가 사용하는 실제 경로들)
         if [ -d "$ANDROID_HOME" ]; then
@@ -228,18 +230,43 @@ jobs:
                         echo "라이센스 수락 전 상태 확인..."
                         $RETRY_SDKMANAGER --list | grep -A5 -B5 "licenses available" 2>/dev/null || echo "라이센스 상태 확인 실패"
 
-                        # 라이센스 수락 실행
+                        # 라이센스 수락 실행 (오류에도 계속 진행)
                         echo "라이센스 수락 실행 중..."
                         LICENSE_OUTPUT_FILE="license_output.log"
+
+                        # 라이센스 디렉토리 미리 생성
+                        mkdir -p "$ANDROID_HOME/licenses" 2>/dev/null || echo "라이센스 디렉토리 생성 시도"
+
+                        set +e  # 라이센스 수락 오류에도 계속 진행
+
+                        # 여러 방법으로 라이센스 수락 시도
+                        echo "방법 1: yes 명령으로 라이센스 수락"
                         (yes | $RETRY_SDKMANAGER --licenses) > $LICENSE_OUTPUT_FILE 2>&1
                         LICENSE_EXIT_CODE=$?
+
+                        if [ $LICENSE_EXIT_CODE -ne 0 ]; then
+                            echo "방법 2: echo로 라이센스 수락"
+                            (echo y; echo y; echo y; echo y; echo y; echo y) | $RETRY_SDKMANAGER --licenses >> $LICENSE_OUTPUT_FILE 2>&1
+                            LICENSE_EXIT_CODE=$?
+                        fi
+
+                        if [ $LICENSE_EXIT_CODE -ne 0 ]; then
+                            echo "방법 3: 라이센스 파일 직접 생성"
+                            echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > "$ANDROID_HOME/licenses/android-sdk-license" 2>/dev/null || echo "라이센스 파일 생성 실패"
+                            echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license" 2>/dev/null || echo "ARM 라이센스 파일 생성 실패"
+                        fi
+
+                        set -e
 
                         echo "라이센스 수락 명령 결과: exit code $LICENSE_EXIT_CODE"
                         if [ -f $LICENSE_OUTPUT_FILE ]; then
                             echo "라이센스 수락 출력 (처음 30줄):"
-                            head -30 $LICENSE_OUTPUT_FILE
+                            head -30 $LICENSE_OUTPUT_FILE || echo "라이센스 출력 읽기 실패"
+                            echo ""
                             echo "라이센스 수락 출력 (마지막 10줄):"
-                            tail -10 $LICENSE_OUTPUT_FILE
+                            tail -10 $LICENSE_OUTPUT_FILE || echo "라이센스 출력 끝부분 읽기 실패"
+                        else
+                            echo "라이센스 출력 파일이 생성되지 않았습니다."
                         fi
 
                         # 라이센스 수락 후 상태 확인
@@ -247,8 +274,10 @@ jobs:
                         $RETRY_SDKMANAGER --list | grep -A5 -B5 "licenses available" 2>/dev/null || echo "라이센스 상태 재확인 실패"
 
                         echo "라이센스 수락 후 buildozer 재실행..."
+                        set +e  # buildozer 재실행 오류에도 계속 진행
                         buildozer android $BUILD_TYPE > build_output_retry.log 2>&1
                         RETRY_EXIT_CODE=$?
+                        set -e
 
                         if [ $RETRY_EXIT_CODE -eq 0 ]; then
                             echo "✅ 재시도 성공!"
