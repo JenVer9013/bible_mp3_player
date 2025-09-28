@@ -320,9 +320,26 @@ jobs:
 
             echo "\n=== 다른 로그 파일 검색 ==="
             find . -name "*.log" -type f 2>/dev/null | head -10 || echo "로그 파일 없음"
-            
+
+            # 모든 로그 파일 내용 출력
+            echo "\n=== 모든 로그 파일 분석 ==="
+            for logfile in build_output_retry.log license_output.log; do
+                if [ -f "$logfile" ]; then
+                    echo "\n--- $logfile 내용 (크기: $(wc -l < $logfile) 줄) ---"
+                    head -50 "$logfile"
+                    if [ $(wc -l < "$logfile") -gt 50 ]; then
+                        echo "\n... (중간 생략) ..."
+                        tail -20 "$logfile"
+                    fi
+                    echo "\n--- $logfile 끝 ---"
+                else
+                    echo "$logfile 파일이 존재하지 않습니다."
+                fi
+            done
+
             echo "\n=== .buildozer 디렉토리 확인 ==="
             if [ -d .buildozer ]; then
+                ls -la .buildozer/
                 find .buildozer -type f -name "*.log" 2>/dev/null | head -5 || echo ".buildozer 내 로그 파일 없음"
             else
                 echo ".buildozer 디렉토리가 생성되지 않았습니다."
