@@ -318,24 +318,39 @@ jobs:
                 fi
             fi
 
-            echo "\n=== 다른 로그 파일 검색 ==="
-            find . -name "*.log" -type f 2>/dev/null | head -10 || echo "로그 파일 없음"
+            echo ""
+            echo "=== 다른 로그 파일 검색 ==="
+            ls -la *.log 2>/dev/null || echo "로그 파일 없음"
 
-            # 모든 로그 파일 내용 출력
-            echo "\n=== 모든 로그 파일 분석 ==="
-            for logfile in build_output_retry.log license_output.log; do
-                if [ -f "$logfile" ]; then
-                    echo "\n--- $logfile 내용 (크기: $(wc -l < $logfile) 줄) ---"
-                    head -50 "$logfile"
-                    if [ $(wc -l < "$logfile") -gt 50 ]; then
-                        echo "\n... (중간 생략) ..."
-                        tail -20 "$logfile"
-                    fi
-                    echo "\n--- $logfile 끝 ---"
-                else
-                    echo "$logfile 파일이 존재하지 않습니다."
-                fi
-            done
+            echo ""
+            echo "=== LICENSE OUTPUT LOG ==="
+            if [ -f license_output.log ]; then
+                echo "license_output.log 크기: $(wc -l < license_output.log) 줄"
+                echo "--- license_output.log 전체 내용 ---"
+                cat license_output.log
+                echo "--- license_output.log 끝 ---"
+            else
+                echo "license_output.log 파일 없음"
+            fi
+
+            echo ""
+            echo "=== BUILD RETRY LOG ==="
+            if [ -f build_output_retry.log ]; then
+                echo "build_output_retry.log 크기: $(wc -l < build_output_retry.log) 줄"
+                echo "--- build_output_retry.log 전체 내용 ---"
+                cat build_output_retry.log
+                echo "--- build_output_retry.log 끝 ---"
+            else
+                echo "build_output_retry.log 파일 없음"
+            fi
+
+            echo ""
+            echo "=== ORIGINAL BUILD LOG 마지막 50줄 ==="
+            if [ -f build_output.log ]; then
+                tail -50 build_output.log
+            else
+                echo "build_output.log 파일 없음"
+            fi
 
             echo "\n=== .buildozer 디렉토리 확인 ==="
             if [ -d .buildozer ]; then
