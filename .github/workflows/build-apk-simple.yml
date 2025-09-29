@@ -37,11 +37,7 @@ jobs:
       uses: android-actions/setup-android@v3
       with:
         cmdline-tools-version: latest
-        packages: |
-          platforms;android-30
-          build-tools;30.0.3
-          build-tools;34.0.0
-          platform-tools
+        packages: platforms;android-30 build-tools;30.0.3 build-tools;34.0.0 platform-tools
 
     - name: 📱 추가 Android 컴포넌트 설치
       run: |
