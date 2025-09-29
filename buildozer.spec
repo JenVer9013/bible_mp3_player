@@ -159,6 +159,9 @@ android.build_tools = 30.0.3
 # (int) Android NDK API to use. This is the minimum API your app will support, it should usually match android.minapi.
 android.ndk_api = 21
 
+# (str) Java 호환성 설정
+android.gradle_dependencies = androidx.multidx:multidex:2.0.1
+
 # (bool) Use --private data storage (True) or --dir public storage (False)
 #android.private_storage = True
 
