@@ -327,18 +327,34 @@ jobs:
             exit $BUILD_EXIT_CODE
         fi
 
-    - name: 📂 빌드 결과 확인
+    - name: 📂 빌드 결과 확인 및 APK 검색
       run: |
         echo "=== 빌드 결과 확인 ==="
-        ls -la bin/ || echo "bin 폴더가 없습니다."
-        find . -name "*.apk" -type f || echo "APK 파일을 찾을 수 없습니다."
+        echo "현재 디렉토리 구조:"
+        ls -la
+
+        echo "bin 폴더 확인:"
+        ls -la bin/ 2>/dev/null || echo "bin 폴더가 없습니다."
+
+        echo "전체 프로젝트에서 APK 파일 검색:"
+        find . -name "*.apk" -type f 2>/dev/null || echo "APK 파일을 찾을 수 없습니다."
+
+        echo ".buildozer 디렉토리에서 APK 검색:"
+        find .buildozer -name "*.apk" -type f 2>/dev/null || echo ".buildozer에 APK 없음"
+
+        echo "dist 폴더 확인:"
+        ls -la dist/ 2>/dev/null || echo "dist 폴더가 없습니다."
 
     - name: 🚀 APK 파일 업로드
       uses: actions/upload-artifact@v4
-      if: success()
+      if: always()  # 빌드 성공 여부와 관계없이 APK 파일이 있으면 업로드
       with:
-        name: bible-mp3-player-${{ github.event.inputs.build_type || 'debug' }}-apk-simple
-        path: bin/*.apk
+        name: bible-mp3-player-${{ github.event.inputs.build_type || 'debug' }}-apk
+        path: |
+          bin/*.apk
+          .buildozer/android/platform/build-*/dist/*.apk
+          dist/*.apk
+          **/*.apk
 
     - name: ✅ 빌드 완료 알림
       if: success()
